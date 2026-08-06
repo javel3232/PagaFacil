@@ -1,10 +1,10 @@
-name: PagaFácil CI/CD Pipeline
+name: PagaFácil — DEV Pipeline (develop)
 
 on:
   push:
-    branches: [main, develop, "release/**", "hotfix/**"]
+    branches: [develop]
   pull_request:
-    branches: [main, develop]
+    branches: [develop]
 
 jobs:
 
@@ -12,26 +12,16 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
-
-      - name: Configurar Python 3.11
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-
       - name: Instalar dependencias
         run: pip install -r requirements.txt
-
       - name: Verificar estructura de microservicios
         run: |
           for service in auth billing payments conciliation notifications reports; do
-            if [ -f "services/$service/main.py" ]; then
-              echo "OK: services/$service/main.py"
-            else
-              echo "ERROR: services/$service/main.py no encontrado"
-              exit 1
-            fi
+            [ -f "services/$service/main.py" ] && echo "OK: $service" || (echo "MISSING: $service" && exit 1)
           done
 
   unit-test:
@@ -39,39 +29,42 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
-
-      - name: Configurar Python 3.11
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-
       - name: Instalar dependencias
         run: pip install -r requirements.txt
-
       - name: Lint con flake8
         run: flake8 services/ --max-line-length=100 --extend-ignore=E302,E303
+      - name: Pruebas unitarias con cobertura
+        run: pytest tests/ -v --tb=short --cov=services --cov-report=term-missing
 
-      - name: Pruebas unitarias con pytest
-        run: pytest tests/ -v --tb=short
-
-  acceptance-test:
-    name: Acceptance Test
+  security-test:
+    name: Security Test
     needs: unit-test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
-
-      - name: Configurar Python 3.11
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-
       - name: Instalar dependencias
         run: pip install -r requirements.txt
+      - name: Analisis de seguridad con bandit
+        run: bandit -r services/ -ll
 
+  acceptance-test:
+    name: Acceptance Test
+    needs: security-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
       - name: Pruebas de aceptacion por modulo
         run: |
           python3 -c "
@@ -91,68 +84,31 @@ jobs:
           assert reconcile('TXN-001', {'code': '00'})['reconciled'] == True
           assert send_notification('RES-001', 'Pago recibido', 'email')['sent'] == True
           assert generate_report('EDIF-001', '2026-08')['building_id'] == 'EDIF-001'
-          print('Todas las pruebas de aceptacion pasaron correctamente')
+          print('Acceptance tests OK')
           "
 
   deploy-dev:
     name: Deploy DEV
     needs: acceptance-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
     steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
-
-      - name: Leer version actual
-        run: |
-          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
+      - uses: actions/checkout@v3
       - name: Deploy a DEV
         run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           echo "Desplegando PagaFacil v$VERSION en DEV"
-          echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "Deploy DEV completado correctamente"
+          echo "Deploy DEV completado"
 
   deploy-qa:
     name: Deploy QA
     needs: deploy-dev
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
     steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
-
-      - name: Leer version actual
-        run: |
-          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
+      - uses: actions/checkout@v3
       - name: Deploy a QA
         run: |
-          echo "Desplegando PagaFacil v$VERSION en QA"
-          echo "Rama:   ${{ github.ref_name }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Deploy QA completado correctamente"
-
-  deploy-pdn:
-    name: Deploy PDN
-    needs: acceptance-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
-
-      - name: Leer version actual
-        run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Deploy a PDN
-        run: |
-          echo "Desplegando PagaFacil v$VERSION en PRODUCCION"
-          echo "Rama:   ${{ github.ref_name }}"
+          echo "Desplegando PagaFacil v$VERSION en QA"
           echo "Commit: ${{ github.sha }}"
-          echo "Deploy PDN completado correctamente"
+          echo "Deploy QA completado"

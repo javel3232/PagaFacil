@@ -1,0 +1,101 @@
+name: PagaFácil — PDN Pipeline (main)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Verificar estructura de microservicios
+        run: |
+          for service in auth billing payments conciliation notifications reports; do
+            [ -f "services/$service/main.py" ] && echo "OK: $service" || (echo "MISSING: $service" && exit 1)
+          done
+
+  unit-test:
+    name: Unit Test
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Lint con flake8
+        run: flake8 services/ --max-line-length=100 --extend-ignore=E302,E303
+      - name: Pruebas unitarias con cobertura
+        run: pytest tests/ -v --tb=short --cov=services --cov-report=term-missing
+
+  security-test:
+    name: Security Test
+    needs: unit-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Analisis de seguridad con bandit
+        run: bandit -r services/ -ll
+
+  acceptance-test:
+    name: Acceptance Test
+    needs: security-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Pruebas de aceptacion por modulo
+        run: |
+          python3 -c "
+          from services.auth.main import authenticate, assign_role
+          from services.billing.main import generate_invoice, cancel_invoice
+          from services.payments.main import process_payment, check_payment_status
+          from services.conciliation.main import reconcile
+          from services.notifications.main import send_notification
+          from services.reports.main import generate_report
+
+          assert authenticate('admin@pagafacil.co', '1234')['status'] == 'ok'
+          assert assign_role('user1', 'residente')['role'] == 'residente'
+          assert generate_invoice('RES-001', 250000, 'administracion')['status'] == 'generada'
+          assert cancel_invoice('INV-001', 'error')['status'] == 'cancelada'
+          assert process_payment('INV-001', 'BANCOLOMBIA', 250000)['status'] == 'pending'
+          assert check_payment_status('TXN-001')['status'] == 'approved'
+          assert reconcile('TXN-001', {'code': '00'})['reconciled'] == True
+          assert send_notification('RES-001', 'Pago recibido', 'email')['sent'] == True
+          assert generate_report('EDIF-001', '2026-08')['building_id'] == 'EDIF-001'
+          print('Acceptance tests OK')
+          "
+
+  deploy-pdn:
+    name: Deploy PDN
+    needs: acceptance-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy a PDN
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          echo "Desplegando PagaFacil v$VERSION en PRODUCCION"
+          echo "Commit: ${{ github.sha }}"
+          echo "Deploy PDN completado"
