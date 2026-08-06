@@ -7,8 +7,37 @@ on:
     branches: [main, develop]
 
 jobs:
-  build-and-test:
-    name: Build & Test
+
+  build:
+    name: 🔨 Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Verificar estructura de microservicios
+        run: |
+          echo "✅ Verificando microservicios..."
+          for service in auth billing payments conciliation notifications reports; do
+            if [ -f "services/$service/main.py" ]; then
+              echo "  ✔ services/$service/main.py OK"
+            else
+              echo "  ✘ services/$service/main.py NO ENCONTRADO"
+              exit 1
+            fi
+          done
+
+  test:
+    name: 🧪 Test
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout código
@@ -25,38 +54,47 @@ jobs:
       - name: Lint con flake8
         run: flake8 services/ --max-line-length=100
 
-      - name: Ejecutar tests
-        run: pytest tests/ -v
+      - name: Ejecutar tests con pytest
+        run: pytest tests/ -v --tb=short
 
   deploy-staging:
-    name: Deploy Staging
-    needs: build-and-test
+    name: 🚀 Deploy Staging
+    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
+
+      - name: Leer versión actual
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Deploy a Staging
         run: |
-          echo "🚀 Desplegando en STAGING..."
-          echo "Rama: ${{ github.ref_name }}"
+          echo "🚀 Desplegando PagaFácil v$VERSION en STAGING..."
+          echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
           echo "✅ Staging actualizado correctamente"
 
   deploy-production:
-    name: Deploy Producción
-    needs: build-and-test
+    name: 🏁 Deploy Producción
+    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
-      - name: Leer versión
-        id: version
-        run: echo "VERSION=$(python3 -c \"import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")" >> $GITHUB_OUTPUT
+
+      - name: Leer versión actual
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Deploy a Producción
         run: |
-          echo "🚀 Desplegando en PRODUCCIÓN v${{ steps.version.outputs.VERSION }}..."
-          echo "Rama: ${{ github.ref_name }}"
+          echo "🏁 Desplegando PagaFácil v$VERSION en PRODUCCIÓN..."
+          echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
           echo "✅ Producción actualizada correctamente"
