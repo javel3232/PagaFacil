@@ -119,3 +119,24 @@ jobs:
           assert generate_report('EDIF-001', '2026-08')['building_id'] == 'EDIF-001'
           print('Acceptance Test QA OK')
           "
+
+  merge-to-main:
+    name: Merge a Main — Activar PDN
+    needs: acceptance-test-qa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configurar git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+      - name: Merge develop a main
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\"")
+          git checkout main
+          git merge --no-ff origin/develop -m "chore(release): merge automatico develop a main v$VERSION | $(date +'%Y-%m-%d')"
+          git push origin main
+          echo "Merge a main completado — pipeline PDN activado"
