@@ -203,7 +203,7 @@ Historial de commits en la rama develop siguiendo la convención de Conventional
 
 Log detallado del stage Deploy PDN mostrando la construcción de la imagen Docker y el despliegue en producción.
 
-![Log Deploy PDN](https://drive.google.com/uc?export=view&id=1nsKr2tN1je7YiYP3f0w_pT8RvxBUZYiN)
+![Log Deploy PDN](https://drive.google.com/uc?export=view&id=1nsKr2tN1je7YiYP3f0w_tH8RvxBUZYiN)
 
 ---
 
