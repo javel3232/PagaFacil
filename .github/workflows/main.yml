@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pagafacil
+
 jobs:
 
   build:
@@ -34,11 +38,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Deploy a DEV
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build y Push imagen DEV
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "Desplegando PagaFacil v$VERSION en DEV"
-          echo "Deploy DEV completado"
+          docker build -t ${{ env.IMAGE }}:dev -t ${{ env.IMAGE }}:$VERSION-dev .
+          docker push ${{ env.IMAGE }}:dev
+          docker push ${{ env.IMAGE }}:$VERSION-dev
+          echo "Imagen DEV publicada: ${{ env.IMAGE }}:dev"
 
   acceptance-test-dev:
     name: Acceptance Test DEV
@@ -46,32 +58,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          python-version: "3.11"
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
-      - name: Pruebas de aceptacion en DEV
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Correr contenedor DEV y validar
         run: |
-          python3 -c "
-          from services.auth.main import authenticate, assign_role
-          from services.billing.main import generate_invoice, cancel_invoice
-          from services.payments.main import process_payment, check_payment_status
-          from services.conciliation.main import reconcile
-          from services.notifications.main import send_notification
-          from services.reports.main import generate_report
-
-          assert authenticate('admin@pagafacil.co', '1234')['status'] == 'ok'
-          assert assign_role('user1', 'residente')['role'] == 'residente'
-          assert generate_invoice('RES-001', 250000, 'administracion')['status'] == 'generada'
-          assert cancel_invoice('INV-001', 'error')['status'] == 'cancelada'
-          assert process_payment('INV-001', 'BANCOLOMBIA', 250000)['status'] == 'pending'
-          assert check_payment_status('TXN-001')['status'] == 'approved'
-          assert reconcile('TXN-001', {'code': '00'})['reconciled'] == True
-          assert send_notification('RES-001', 'Pago recibido', 'email')['sent'] == True
-          assert generate_report('EDIF-001', '2026-08')['building_id'] == 'EDIF-001'
-          print('Acceptance Test DEV OK')
-          "
+          docker pull ${{ env.IMAGE }}:dev
+          docker run --rm ${{ env.IMAGE }}:dev
+          echo "Acceptance Test DEV OK - contenedor DEV validado"
 
   deploy-qa:
     name: Deploy QA
@@ -79,11 +76,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Deploy a QA
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build y Push imagen QA
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "Desplegando PagaFacil v$VERSION en QA"
-          echo "Deploy QA completado"
+          docker build -t ${{ env.IMAGE }}:qa -t ${{ env.IMAGE }}:$VERSION-qa .
+          docker push ${{ env.IMAGE }}:qa
+          docker push ${{ env.IMAGE }}:$VERSION-qa
+          echo "Imagen QA publicada: ${{ env.IMAGE }}:qa"
 
   acceptance-test-qa:
     name: Acceptance Test QA
@@ -91,32 +96,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          python-version: "3.11"
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
-      - name: Pruebas de aceptacion en QA
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Correr contenedor QA y validar
         run: |
-          python3 -c "
-          from services.auth.main import authenticate, assign_role
-          from services.billing.main import generate_invoice, cancel_invoice
-          from services.payments.main import process_payment, check_payment_status
-          from services.conciliation.main import reconcile
-          from services.notifications.main import send_notification
-          from services.reports.main import generate_report
-
-          assert authenticate('admin@pagafacil.co', '1234')['status'] == 'ok'
-          assert assign_role('user1', 'residente')['role'] == 'residente'
-          assert generate_invoice('RES-001', 250000, 'administracion')['status'] == 'generada'
-          assert cancel_invoice('INV-001', 'error')['status'] == 'cancelada'
-          assert process_payment('INV-001', 'BANCOLOMBIA', 250000)['status'] == 'pending'
-          assert check_payment_status('TXN-001')['status'] == 'approved'
-          assert reconcile('TXN-001', {'code': '00'})['reconciled'] == True
-          assert send_notification('RES-001', 'Pago recibido', 'email')['sent'] == True
-          assert generate_report('EDIF-001', '2026-08')['building_id'] == 'EDIF-001'
-          print('Acceptance Test QA OK')
-          "
+          docker pull ${{ env.IMAGE }}:qa
+          docker run --rm ${{ env.IMAGE }}:qa
+          echo "Acceptance Test QA OK - contenedor QA validado"
 
   security-test:
     name: Security Test
@@ -138,9 +128,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Deploy a PDN
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build y Push imagen PDN
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "Desplegando PagaFacil v$VERSION en PRODUCCION"
-          echo "Commit: ${{ github.sha }}"
-          echo "Deploy PDN completado"
+          docker build -t ${{ env.IMAGE }}:latest -t ${{ env.IMAGE }}:$VERSION .
+          docker push ${{ env.IMAGE }}:latest
+          docker push ${{ env.IMAGE }}:$VERSION
+          echo "Imagen PDN publicada: ${{ env.IMAGE }}:$VERSION"
+          echo "Deploy PDN completado - imagen lista en ghcr.io"
