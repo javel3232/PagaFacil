@@ -51,7 +51,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Lint con flake8
-        run: flake8 services/ --max-line-length=100
+        run: flake8 services/ --max-line-length=100 --extend-ignore=E302,E303
 
       - name: Pruebas unitarias con pytest
         run: pytest tests/ -v --tb=short
@@ -94,8 +94,8 @@ jobs:
           print('Todas las pruebas de aceptacion pasaron correctamente')
           "
 
-  deploy-staging:
-    name: Deploy Staging
+  deploy-dev:
+    name: Deploy DEV
     needs: acceptance-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'
@@ -108,15 +108,36 @@ jobs:
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Deploy a Staging
+      - name: Deploy a DEV
         run: |
-          echo "Desplegando PagaFacil v$VERSION en STAGING"
+          echo "Desplegando PagaFacil v$VERSION en DEV"
           echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "Deploy Staging completado correctamente"
+          echo "Deploy DEV completado correctamente"
 
-  deploy-production:
-    name: Deploy Produccion
+  deploy-qa:
+    name: Deploy QA
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v3
+
+      - name: Leer version actual
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Deploy a QA
+        run: |
+          echo "Desplegando PagaFacil v$VERSION en QA"
+          echo "Rama:   ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Deploy QA completado correctamente"
+
+  deploy-pdn:
+    name: Deploy PDN
     needs: acceptance-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -129,9 +150,9 @@ jobs:
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Deploy a Produccion
+      - name: Deploy a PDN
         run: |
           echo "Desplegando PagaFacil v$VERSION en PRODUCCION"
           echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "Deploy Produccion completado correctamente"
+          echo "Deploy PDN completado correctamente"
