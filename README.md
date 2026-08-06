@@ -167,25 +167,43 @@ Build → Deploy DEV → Acceptance Test DEV → Deploy QA → Acceptance Test Q
 
 ## 6. Evidencias del Pipeline
 
-### Captura pipeline develop — todos los stages hasta QA
+A continuación se presentan las evidencias visuales del pipeline CI/CD funcionando en GitHub Actions.
 
-> [Insertar captura de pantalla del pipeline develop en GitHub Actions]
+### Pipeline en ejecución — rama develop
 
-### Captura pipeline main — todos los stages incluyendo Security y PDN
+Muestra todos los stages del pipeline corriendo desde Build hasta Acceptance Test QA en la rama develop.
 
-> [Insertar captura de pantalla del pipeline main en GitHub Actions]
+![Pipeline develop en ejecucion](https://drive.google.com/uc?export=view&id=1VoCjiMEwURpsHPTNmIc-0YRLIoUx0dXQ)
 
-### Captura Build y Unit Test exitosos
+### Pipeline develop — hasta Acceptance Test QA completado
 
-> [Insertar captura de pantalla del stage Build con pytest y flake8]
+Todos los stages de develop completados exitosamente hasta Acceptance Test QA.
 
-### Captura Acceptance Test DEV y QA exitosos
+![Pipeline develop hasta Acceptance QA](https://drive.google.com/uc?export=view&id=1STuqK-p7ZVA2T38m9mh0TywGazQaPW-E)
 
-> [Insertar captura de pantalla de los acceptance tests]
+### Pipeline main — Deploy PDN corriendo
 
-### Captura Security Test y Deploy PDN exitosos
+Stage Deploy PDN ejecutándose en la rama main después de pasar todos los stages previos.
 
-> [Insertar captura de pantalla del Security Test con bandit y Deploy PDN]
+![Deploy PDN corriendo](https://drive.google.com/uc?export=view&id=1PXzcKZKnREowImccANmu8PWrXHiuQlZu)
+
+### Pipeline main — todos los stages completados
+
+Vista completa del pipeline en main con todos los stages en verde incluyendo Security Test y Deploy PDN.
+
+![Pipeline completo main](https://drive.google.com/uc?export=view&id=1TcWDuDbt4rlsNEM5BfRy8EdIRdRURAXS)
+
+### Commits en rama develop
+
+Historial de commits en la rama develop siguiendo la convención de Conventional Commits con versionamiento semántico.
+
+![Commits develop](https://drive.google.com/uc?export=view&id=1hb8PU8cTuj7g2nUbg1RzvKRR5_f55KFG)
+
+### Log de despliegue Deploy PDN
+
+Log detallado del stage Deploy PDN mostrando la construcción de la imagen Docker y el despliegue en producción.
+
+![Log Deploy PDN](https://drive.google.com/uc?export=view&id=1nsKr2tN1je7YiYP3f0w_pT8RvxBUZYiN)
 
 ---
 
