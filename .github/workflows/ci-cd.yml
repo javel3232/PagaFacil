@@ -9,10 +9,10 @@ on:
 jobs:
 
   build:
-    name: 🔨 Build
+    name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v3
 
       - name: Configurar Python 3.11
@@ -25,22 +25,21 @@ jobs:
 
       - name: Verificar estructura de microservicios
         run: |
-          echo "✅ Verificando microservicios..."
           for service in auth billing payments conciliation notifications reports; do
             if [ -f "services/$service/main.py" ]; then
-              echo "  ✔ services/$service/main.py OK"
+              echo "OK: services/$service/main.py"
             else
-              echo "  ✘ services/$service/main.py NO ENCONTRADO"
+              echo "ERROR: services/$service/main.py no encontrado"
               exit 1
             fi
           done
 
-  test:
-    name: 🧪 Test
+  unit-test:
+    name: Unit Test
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v3
 
       - name: Configurar Python 3.11
@@ -54,47 +53,85 @@ jobs:
       - name: Lint con flake8
         run: flake8 services/ --max-line-length=100
 
-      - name: Ejecutar tests con pytest
+      - name: Pruebas unitarias con pytest
         run: pytest tests/ -v --tb=short
 
+  acceptance-test:
+    name: Acceptance Test
+    needs: unit-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas de aceptacion por modulo
+        run: |
+          python3 -c "
+          from services.auth.main import authenticate, assign_role
+          from services.billing.main import generate_invoice, cancel_invoice
+          from services.payments.main import process_payment, check_payment_status
+          from services.conciliation.main import reconcile
+          from services.notifications.main import send_notification
+          from services.reports.main import generate_report
+
+          assert authenticate('admin@pagafacil.co', '1234')['status'] == 'ok'
+          assert assign_role('user1', 'residente')['role'] == 'residente'
+          assert generate_invoice('RES-001', 250000, 'administracion')['status'] == 'generada'
+          assert cancel_invoice('INV-001', 'error')['status'] == 'cancelada'
+          assert process_payment('INV-001', 'BANCOLOMBIA', 250000)['status'] == 'pending'
+          assert check_payment_status('TXN-001')['status'] == 'approved'
+          assert reconcile('TXN-001', {'code': '00'})['reconciled'] == True
+          assert send_notification('RES-001', 'Pago recibido', 'email')['sent'] == True
+          assert generate_report('EDIF-001', '2026-08')['building_id'] == 'EDIF-001'
+          print('Todas las pruebas de aceptacion pasaron correctamente')
+          "
+
   deploy-staging:
-    name: 🚀 Deploy Staging
-    needs: test
+    name: Deploy Staging
+    needs: acceptance-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'
     steps:
-      - name: Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v3
 
-      - name: Leer versión actual
+      - name: Leer version actual
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Deploy a Staging
         run: |
-          echo "🚀 Desplegando PagaFácil v$VERSION en STAGING..."
+          echo "Desplegando PagaFacil v$VERSION en STAGING"
           echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "✅ Staging actualizado correctamente"
+          echo "Deploy Staging completado correctamente"
 
   deploy-production:
-    name: 🏁 Deploy Producción
-    needs: test
+    name: Deploy Produccion
+    needs: acceptance-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v3
 
-      - name: Leer versión actual
+      - name: Leer version actual
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Deploy a Producción
+      - name: Deploy a Produccion
         run: |
-          echo "🏁 Desplegando PagaFácil v$VERSION en PRODUCCIÓN..."
+          echo "Desplegando PagaFacil v$VERSION en PRODUCCION"
           echo "Rama:   ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "✅ Producción actualizada correctamente"
+          echo "Deploy Produccion completado correctamente"
