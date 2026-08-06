@@ -1,0 +1,112 @@
+name: PagaFácil CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  IMAGE: pagafacil
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Verificar estructura
+        run: |
+          for service in auth billing payments conciliation notifications reports; do
+            [ -f "services/$service/main.py" ] && echo "OK: $service" || (echo "MISSING: $service" && exit 1)
+          done
+      - name: Lint con flake8
+        run: flake8 services/ --max-line-length=100 --extend-ignore=E302,E303
+      - name: Pruebas unitarias
+        run: pytest tests/ -v --tb=short --cov=services --cov-report=term-missing
+
+  deploy-dev:
+    name: Deploy DEV
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build imagen DEV
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          docker build -t ${{ env.IMAGE }}:dev -t ${{ env.IMAGE }}:$VERSION-dev .
+          echo "Imagen DEV construida: ${{ env.IMAGE }}:$VERSION-dev"
+
+  acceptance-test-dev:
+    name: Acceptance Test DEV
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build imagen DEV
+        run: docker build -t ${{ env.IMAGE }}:dev .
+      - name: Correr contenedor DEV y validar
+        run: |
+          docker run --rm ${{ env.IMAGE }}:dev
+          echo "Acceptance Test DEV OK"
+
+  deploy-qa:
+    name: Deploy QA
+    needs: acceptance-test-dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build imagen QA
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          docker build -t ${{ env.IMAGE }}:qa -t ${{ env.IMAGE }}:$VERSION-qa .
+          echo "Imagen QA construida: ${{ env.IMAGE }}:$VERSION-qa"
+
+  acceptance-test-qa:
+    name: Acceptance Test QA
+    needs: deploy-qa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build imagen QA
+        run: docker build -t ${{ env.IMAGE }}:qa .
+      - name: Correr contenedor QA y validar
+        run: |
+          docker run --rm ${{ env.IMAGE }}:qa
+          echo "Acceptance Test QA OK"
+
+  security-test:
+    name: Security Test
+    needs: acceptance-test-qa
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Analisis de seguridad con bandit
+        run: bandit -r services/ -ll
+
+  deploy-pdn:
+    name: Deploy PDN
+    needs: security-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build imagen PDN
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          docker build -t ${{ env.IMAGE }}:latest -t ${{ env.IMAGE }}:$VERSION .
+          echo "Imagen PDN construida: ${{ env.IMAGE }}:$VERSION"
+          docker run --rm ${{ env.IMAGE }}:latest
+          echo "Deploy PDN completado - v$VERSION"
