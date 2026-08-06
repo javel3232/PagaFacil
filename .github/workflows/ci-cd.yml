@@ -1,13 +1,12 @@
-name: PagaFácil — PDN Pipeline
+name: PagaFácil CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 env:
-  REGISTRY: ghcr.io
   IMAGE: ghcr.io/${{ github.repository_owner }}/pagafacil
 
 jobs:
@@ -68,7 +67,7 @@ jobs:
         run: |
           docker pull ${{ env.IMAGE }}:dev
           docker run --rm ${{ env.IMAGE }}:dev
-          echo "Acceptance Test DEV OK - contenedor DEV validado"
+          echo "Acceptance Test DEV OK"
 
   deploy-qa:
     name: Deploy QA
@@ -106,11 +105,12 @@ jobs:
         run: |
           docker pull ${{ env.IMAGE }}:qa
           docker run --rm ${{ env.IMAGE }}:qa
-          echo "Acceptance Test QA OK - contenedor QA validado"
+          echo "Acceptance Test QA OK"
 
   security-test:
     name: Security Test
     needs: acceptance-test-qa
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -125,6 +125,7 @@ jobs:
   deploy-pdn:
     name: Deploy PDN
     needs: security-test
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -141,4 +142,3 @@ jobs:
           docker push ${{ env.IMAGE }}:latest
           docker push ${{ env.IMAGE }}:$VERSION
           echo "Imagen PDN publicada: ${{ env.IMAGE }}:$VERSION"
-          echo "Deploy PDN completado - imagen lista en ghcr.io"
