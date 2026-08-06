@@ -1,4 +1,4 @@
-name: PagaFácil — DEV Pipeline (develop)
+name: PagaFácil — DEV Pipeline
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
 
 jobs:
 
-  build:
-    name: Build
+  ci:
+    name: CI — Build y Unit Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -18,31 +18,32 @@ jobs:
           python-version: "3.11"
       - name: Instalar dependencias
         run: pip install -r requirements.txt
-      - name: Verificar estructura de microservicios
+      - name: Verificar estructura
         run: |
           for service in auth billing payments conciliation notifications reports; do
             [ -f "services/$service/main.py" ] && echo "OK: $service" || (echo "MISSING: $service" && exit 1)
           done
-
-  unit-test:
-    name: Unit Test
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
       - name: Lint con flake8
         run: flake8 services/ --max-line-length=100 --extend-ignore=E302,E303
       - name: Pruebas unitarias con cobertura
         run: pytest tests/ -v --tb=short --cov=services --cov-report=term-missing
 
+  deploy-dev:
+    name: Deploy DEV
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy a DEV
+        run: |
+          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
+          echo "Desplegando PagaFacil v$VERSION en DEV"
+          echo "Commit: ${{ github.sha }}"
+          echo "Deploy DEV completado"
+
   security-test:
     name: Security Test
-    needs: unit-test
+    needs: deploy-dev
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -87,22 +88,9 @@ jobs:
           print('Acceptance tests OK')
           "
 
-  deploy-dev:
-    name: Deploy DEV
-    needs: acceptance-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy a DEV
-        run: |
-          VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
-          echo "Desplegando PagaFacil v$VERSION en DEV"
-          echo "Commit: ${{ github.sha }}"
-          echo "Deploy DEV completado"
-
   deploy-qa:
     name: Deploy QA
-    needs: deploy-dev
+    needs: acceptance-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

@@ -1,4 +1,4 @@
-name: PagaFácil — PDN Pipeline (main)
+name: PagaFácil — PDN Pipeline
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
 
 jobs:
 
-  build:
-    name: Build
+  ci:
+    name: CI — Build y Unit Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -18,23 +18,11 @@ jobs:
           python-version: "3.11"
       - name: Instalar dependencias
         run: pip install -r requirements.txt
-      - name: Verificar estructura de microservicios
+      - name: Verificar estructura
         run: |
           for service in auth billing payments conciliation notifications reports; do
             [ -f "services/$service/main.py" ] && echo "OK: $service" || (echo "MISSING: $service" && exit 1)
           done
-
-  unit-test:
-    name: Unit Test
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
       - name: Lint con flake8
         run: flake8 services/ --max-line-length=100 --extend-ignore=E302,E303
       - name: Pruebas unitarias con cobertura
@@ -42,7 +30,7 @@ jobs:
 
   security-test:
     name: Security Test
-    needs: unit-test
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
