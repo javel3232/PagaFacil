@@ -16,7 +16,7 @@ def test_authenticate():
     assert result["user"] == "admin@pagafacil.co"
 
 def test_generate_invoice():
-    result = generate_invoice("RES-001", 250000, "Cuota administración")
+    result = generate_invoice("RES-001", 250000, "administracion")
     assert "invoice_id" in result
     assert result["amount"] == 250000
 
