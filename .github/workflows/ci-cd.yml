@@ -7,7 +7,7 @@ on:
     branches: [main, develop]
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/pagafacil
+  IMAGE: pagafacil
 
 jobs:
 
@@ -37,19 +37,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Login a GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build y Push imagen DEV
+      - name: Build imagen DEV
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           docker build -t ${{ env.IMAGE }}:dev -t ${{ env.IMAGE }}:$VERSION-dev .
-          docker push ${{ env.IMAGE }}:dev
-          docker push ${{ env.IMAGE }}:$VERSION-dev
-          echo "Imagen DEV publicada: ${{ env.IMAGE }}:dev"
+          echo "Imagen DEV construida: ${{ env.IMAGE }}:$VERSION-dev"
 
   acceptance-test-dev:
     name: Acceptance Test DEV
@@ -57,15 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Login a GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build imagen DEV
+        run: docker build -t ${{ env.IMAGE }}:dev .
       - name: Correr contenedor DEV y validar
         run: |
-          docker pull ${{ env.IMAGE }}:dev
           docker run --rm ${{ env.IMAGE }}:dev
           echo "Acceptance Test DEV OK"
 
@@ -75,19 +62,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Login a GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build y Push imagen QA
+      - name: Build imagen QA
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           docker build -t ${{ env.IMAGE }}:qa -t ${{ env.IMAGE }}:$VERSION-qa .
-          docker push ${{ env.IMAGE }}:qa
-          docker push ${{ env.IMAGE }}:$VERSION-qa
-          echo "Imagen QA publicada: ${{ env.IMAGE }}:qa"
+          echo "Imagen QA construida: ${{ env.IMAGE }}:$VERSION-qa"
 
   acceptance-test-qa:
     name: Acceptance Test QA
@@ -95,15 +74,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Login a GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build imagen QA
+        run: docker build -t ${{ env.IMAGE }}:qa .
       - name: Correr contenedor QA y validar
         run: |
-          docker pull ${{ env.IMAGE }}:qa
           docker run --rm ${{ env.IMAGE }}:qa
           echo "Acceptance Test QA OK"
 
@@ -129,16 +103,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Login a GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build y Push imagen PDN
+      - name: Build imagen PDN
         run: |
           VERSION=$(python3 -c "import json; v=json.load(open('version.json')); print(f\"{v['major']}.{v['minor']}.{v['patch']}\")")
           docker build -t ${{ env.IMAGE }}:latest -t ${{ env.IMAGE }}:$VERSION .
-          docker push ${{ env.IMAGE }}:latest
-          docker push ${{ env.IMAGE }}:$VERSION
-          echo "Imagen PDN publicada: ${{ env.IMAGE }}:$VERSION"
+          echo "Imagen PDN construida: ${{ env.IMAGE }}:$VERSION"
+          docker run --rm ${{ env.IMAGE }}:latest
+          echo "Deploy PDN completado - v$VERSION"
